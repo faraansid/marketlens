@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -39,7 +39,19 @@ class Settings(BaseSettings):
     master_max_failures_per_hour: int = 10  # global cap on wrong master-password attempts
 
     # --- Database ----------------------------------------------------------
-    database_url: str = f"sqlite:///{(BACKEND_DIR / 'data' / 'marketlens.db').as_posix()}"
+    # Resolution order (see `_resolve_database_url`):
+    #   1. DATABASE_URL (e.g. Railway Postgres; postgres:// is normalised)
+    #   2. SQLite on a mounted volume (Railway sets RAILWAY_VOLUME_MOUNT_PATH)
+    #   3. SQLite under backend/data (local development)
+    database_url: str = ""
+    railway_volume_mount_path: str | None = None
+
+    # --- First-run bootstrap (for hosts without an interactive shell) --------
+    # Used only when no owner / master password exists yet; never overwrites.
+    owner_username: str | None = None
+    owner_password: str | None = None
+    owner_name: str | None = None
+    master_password: str | None = None
 
     # --- Scheduler ---------------------------------------------------------
     run_scheduler_in_api: bool = True  # set False when running the separate worker process
@@ -80,6 +92,22 @@ class Settings(BaseSettings):
     def _env(cls, v: str) -> str:
         return v.lower().strip()
 
+    @model_validator(mode="after")
+    def _resolve_database_url(self) -> "Settings":
+        url = (self.database_url or "").strip()
+        if url:
+            # Railway/Heroku style URLs -> SQLAlchemy + psycopg 3 driver.
+            if url.startswith("postgres://"):
+                url = "postgresql+psycopg://" + url[len("postgres://"):]
+            elif url.startswith("postgresql://"):
+                url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        elif self.railway_volume_mount_path:
+            url = f"sqlite:///{(Path(self.railway_volume_mount_path) / 'marketlens.db').as_posix()}"
+        else:
+            url = f"sqlite:///{(BACKEND_DIR / 'data' / 'marketlens.db').as_posix()}"
+        self.database_url = url
+        return self
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
@@ -103,6 +131,7 @@ def get_settings() -> Settings:
     if not s.secret_key or len(s.secret_key) < 32:
         raise RuntimeError(
             "SECRET_KEY is missing or too short (min 32 chars). "
-            "Copy .env.example to .env and set SECRET_KEY."
+            "Set it as an environment variable (Railway: service > Variables) "
+            "or copy .env.example to .env locally."
         )
     return s

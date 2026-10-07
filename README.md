@@ -180,12 +180,47 @@ open http://localhost:5173. Vite proxies `/api` to port 8000.
 counts. That takes roughly 15–20 minutes, depending on the provider. You can watch progress in the server
 log or run it explicitly with `python -m app.worker --once`. Later runs take a few minutes.
 
+## Deploying to Railway
+
+The repo is ready for Railway. `railway.json` tells Railway to build the `Dockerfile`, which compiles the web
+UI and runs the API with the 30-minute scheduler in one service. Railway's `$PORT` is used automatically, and
+`/api/health` is the health check.
+
+1. **New project → Deploy from GitHub repo** → pick this repository.
+2. **Add persistent storage.** Without it, the database is wiped on every deploy. Choose one:
+   * **Volume (simplest):** right-click the service → *Attach volume* → mount path `/data`. The app detects
+     `RAILWAY_VOLUME_MOUNT_PATH` and stores SQLite there. Nothing else to set.
+   * **Postgres:** add a Postgres database to the project, then set the service variable
+     `DATABASE_URL=${{Postgres.DATABASE_URL}}`. `postgres://` URLs are converted automatically.
+3. **Variables** (service → *Variables*):
+
+   | Variable | Required | Value |
+   |---|---|---|
+   | `SECRET_KEY` | yes | a random string of at least 32 characters |
+   | `OWNER_USERNAME` | first deploy | the owner's username |
+   | `OWNER_PASSWORD` | first deploy | the owner's password |
+   | `OWNER_NAME` | no | display name |
+   | `MASTER_PASSWORD` | first deploy | enables "Change password" on the sign-in page |
+
+   The owner and master password are created **only if they don't exist yet**. Changing these variables later
+   does not overwrite anything. Change passwords inside the app instead.
+4. **Settings → Networking → Generate Domain**, then open it and sign in with the owner account.
+
+The first market-data refresh starts automatically after deploy and takes about 15–20 minutes (2 years of
+history for about 2,500 NSE companies). The dashboard fills in when it finishes. The deploy logs show progress.
+
+Notes:
+* Keep **1 replica**. The scheduler runs in-process, and login throttling is in-memory.
+* The first backfill uses roughly 0.5–1 GB of RAM. Make sure your Railway plan allows that.
+* Yahoo Finance can rate-limit cloud IPs more than home connections. The pipeline retries with backoff, and the
+  app keeps serving the last good data if a refresh fails.
+
 ### Production notes
 
-* Set `ENVIRONMENT=production`. This enables Secure cookies and hides the API docs.
+* Set `ENVIRONMENT=production` (the Docker image does this). This enables Secure cookies and hides the API docs.
 * Run the API with `RUN_SCHEDULER_IN_API=false` and a separate worker (`python -m app.worker`), so the API can
   scale independently. The `job_runs` table prevents overlapping runs across processes.
-* Use PostgreSQL in production: `DATABASE_URL=postgresql+psycopg://...`, plus `pip install "psycopg[binary]"`.
+* For PostgreSQL, set `DATABASE_URL` (`postgres://`, `postgresql://` or `postgresql+psycopg://`). The driver is included.
 * Set a long master password and a strong owner password. Both are recoverable only with server access (the scripts above).
 * Login throttling is in-process. Back it with Redis if you run several API instances.
 

@@ -30,6 +30,10 @@ UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    from app.bootstrap import run_bootstrap
+
+    run_bootstrap()
+    log.info("Database: %s", settings.database_url.split("://", 1)[0] + "://…")  # scheme only, never credentials
     sched = None
     if settings.run_scheduler_in_api:
         from app.pipeline.scheduler import build_scheduler

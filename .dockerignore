@@ -1,0 +1,16 @@
+.git
+.env
+**/.env
+**/*.db
+**/*.db-shm
+**/*.db-wal
+backend/data/
+backend/.venv/
+**/__pycache__/
+**/.pytest_cache/
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+.claude/
+*.log
+run.bat

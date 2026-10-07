@@ -25,6 +25,9 @@ def main() -> None:
     s = get_settings()
     setup_logging(s.log_level)
     init_db()
+    from app.bootstrap import run_bootstrap
+
+    run_bootstrap()
     log = logging.getLogger("worker")
 
     if args.once:
