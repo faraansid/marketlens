@@ -1,0 +1,7 @@
+{
+  "trend": { "strong_threshold": 60, "trend_threshold": 25 },
+  "vcp": { "max_final_depth_pct": 10, "min_contractions": 2 },
+  "falling_wedge": { "lookbacks": [40, 60, 90, 120], "min_confidence": 50 },
+  "breakout": { "resistance_lookback": 50, "volume_multiple": 1.5, "near_pct": 3 },
+  "status": { "volume_multiple": 1.5, "near_pct": 3 }
+}

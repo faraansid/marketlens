@@ -1,0 +1,18 @@
+# Secrets & local data (never commit)
+.env
+*.db
+*.db-shm
+*.db-wal
+backend/data/
+
+# Installed dependencies & build output (recreated by setup / run.bat)
+backend/.venv/
+node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+__pycache__/
+.pytest_cache/
+
+# Local tooling / logs
+.claude/
+*.log
